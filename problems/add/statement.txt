@@ -1,0 +1,11 @@
+Problem: add two integers
+
+Read two integers on a single line, separated by whitespace, and print their sum
+followed by a newline.
+
+Input format : one line with two integers a and b, each in the range of a signed 32-bit int
+               (-2147483648 .. 2147483647). Extra spaces or tabs around the numbers are allowed.
+Output format: the mathematically correct sum a + b (it may need more than 32 bits).
+
+Sample input : 7 5
+Sample output: 12

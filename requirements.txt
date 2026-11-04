@@ -1,0 +1,43 @@
+# =============================================================================
+# GraderGent - dependencies
+# Install the Python packages with:   pip install -r requirements.txt
+# Everything else the code imports (subprocess, re, json, glob, tempfile,
+# concurrent.futures, argparse, ...) is part of the Python standard library.
+# Tested with Python 3.10+ (Ubuntu 22.04 / 24.04, Debian 12).
+# =============================================================================
+
+# --- Python packages ---------------------------------------------------------
+
+# Web front end (front_app.py). Only imported when the UI is started, so the
+# command-line mode (python front_app.py --cli ...) works without it.
+# Pinned below version 6 because the theme API (used for the plain grey UI)
+# moved in Gradio 6.
+gradio>=4.44,<6
+
+# HTTP client used by llm_client.py to talk to the local Ollama server
+# (POST http://localhost:11434/api/chat). Needed by every LLM-based part:
+# readability review, failure explanations, counter-test generation and the
+# LLM-copy check. Without a running Ollama the agent still works and falls back
+# to simple heuristics (it adds an "llm_unavailable" flag to the report).
+requests>=2.31
+
+# --- System packages (installed with apt, NOT with pip) ------------------------
+#
+#   sudo apt update
+#   sudo apt install -y gcc cppcheck
+#
+#   gcc       REQUIRED. Compiles submissions, counts warnings (syntax metric)
+#             and builds the AddressSanitizer/UBSan binary (memory_safety).
+#             The sanitizer runtime ships with gcc on Ubuntu/Debian.
+#   cppcheck  OPTIONAL. Extra static-analysis findings for the "structure"
+#             metric. If it is missing, that part is skipped automatically.
+#
+# --- Local LLM (Ollama, installed separately) ----------------------------------
+#
+#   curl -fsSL https://ollama.com/install.sh | sh
+#   ollama pull llama3.1
+#
+#   Ollama is the main evaluator for readability and writes the explanations.
+#   The model name, temperature and seed are set in the "llm" block of the
+#   rules file (rules/add_rules.json). Any model you have pulled works, e.g.
+#   "llama3.2" or "qwen2.5-coder" on a small machine.

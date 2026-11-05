@@ -56,6 +56,41 @@ are installed during setup; they are not bundled in the archive.
 - Optional local Ollama integration for readability, explanations, extra test inputs,
   and comparison against generated solutions.
 
+## How to use AutoGrader
+
+AutoGrader runs on your own computer. This repository provides the application
+and documentation; `127.0.0.1:7860` opens your local instance after you start it.
+
+1. **Download and extract:** choose **Code → Download ZIP**, or clone this repository.
+2. **Set up your operating system:** follow [Windows / WSL2 setup](#install-on-windows)
+   or [Ubuntu / Debian setup](#install-on-ubuntu--debian).
+3. **Start the application:** on Windows, double-click `Start-AutoGrader.cmd`.
+   On Linux, open a terminal in the project folder and run `bash run-local.sh`.
+4. **Open the browser:** visit **http://127.0.0.1:7860/** and keep the launch terminal open.
+5. **Register and sign in:** use your `@iitp.ac.in` email. The current web interface
+   accepts only this domain and does not use a password or verify mailbox ownership.
+6. **Try the included example:** select **Agentic AI assignment**, select the example
+   `add.c`, and click **Grade**. You can then upload your own `.c` file for that assignment.
+7. **Understand the result:** review the overall score, metric chart, failing inputs,
+   expected versus actual outputs, and improvement suggestions.
+8. **Save your work:** download the HTML, text, and JSON reports. Sign out when finished;
+   press **Ctrl+C** in the launch terminal to stop the app.
+
+### Users without an IIT Patna email
+
+You can run the local command-line grader without a web account. After completing
+the same Linux or WSL2 setup, run these commands from the project folder in Ubuntu:
+
+```bash
+bash run-local.sh --cli problems/agentic_ai/add.c
+bash run-local.sh --cli samples/add_clean.c --rules rules/agentic_ai.json
+```
+
+Replace the sample path with your own C file. Reports are saved in `reports/`.
+Ollama is optional: without it, available local checks run and the report identifies
+the AI features that were unavailable. See [Customize rules and problems](#customize-rules-and-problems)
+to configure a different assignment before grading unrelated programs.
+
 ## Requirements
 
 | Component | Requirement |

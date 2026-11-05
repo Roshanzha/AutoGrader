@@ -1,0 +1,21 @@
+.venv-linux/
+.venv/
+__pycache__/
+*.py[cod]
+.cache/
+*.log
+
+# Local runs, accounts, and document build intermediates
+/reports/*
+!/reports/.gitkeep
+/tmp/
+/output/
+/.chart-data-*/
+*.sqlite3
+*.sqlite3-*
+.env
+.env.*
+!.env.example
+
+# Downloadable release archives are built locally, not committed recursively
+/dist/

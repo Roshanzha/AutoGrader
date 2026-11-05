@@ -8,6 +8,7 @@ Two outputs per submission (same names as in the assignment):
 """
 import json
 import os
+import result_analysis
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 
@@ -23,9 +24,11 @@ def _block(label, text):
 def render_text(report):
     """Build the student-facing text report."""
     out = [f"===== Grading report for {report['submission']} =====",
+           f"Problem: {report['problem']}",
            f"Overall grade: {report['grade']:.1f} / 100"]
     if report.get("partial"):
         out.append("(PARTIAL REPORT: execution-based metrics were skipped, see Flags)")
+    out += ["", "--- Result analysis ---", *result_analysis.analysis(report)]
     out += ["", f"{'Metric':<16}{'Weight':>7}  {'Points':>9}  Note"]
 
     for m in report["metrics"]:
@@ -87,4 +90,7 @@ def write_reports(report, text, out_dir=None):
         json.dump(report, f, indent=2, ensure_ascii=False)
     with open(txt_path, "w", encoding="utf-8") as f:
         f.write(text)
-    return json_path, txt_path
+    html_path = os.path.join(out_dir, stem + ".html")
+    with open(html_path, "w", encoding="utf-8") as f:
+        f.write(result_analysis.standalone(report))
+    return json_path, txt_path, html_path

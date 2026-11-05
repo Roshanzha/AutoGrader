@@ -1,0 +1,59 @@
+{
+  "problem": "agentic_ai_add_two_integers",
+  "statement_file": "problems/agentic_ai/statement.txt",
+  "reference_solution": "problems/agentic_ai/reference.c",
+  "time_limit_s": 1,
+  "memory_limit_mb": 64,
+
+  "llm": {
+    "host": "http://localhost:11434",
+    "model": "llama3.1",
+    "temperature": 0,
+    "seed": 42
+  },
+
+  "edge_cases": {
+    "negatives":    ["-5 -7", "-1 5", "-2147483648 0"],
+    "zero":         ["0 0", "0 5", "5 0"],
+    "int_overflow": ["2147483647 1", "2147483647 2147483647", "-2147483648 -1", "-2147483648 -2147483648"]
+  },
+
+  "metrics": [
+    {
+      "name": "correctness", "analyzer": "io_tests", "weight": 0.20,
+      "params": { "testset_dir": "problems/agentic_ai/tests/" }
+    },
+    {
+      "name": "syntax", "analyzer": "compiler_warnings", "weight": 0.10,
+      "params": { "flags": "-Wall -Wextra -Werror -std=c11" }
+    },
+    {
+      "name": "structure", "analyzer": "static_analysis", "weight": 0.10,
+      "params": { "max_cyclomatic": 8, "max_function_length": 40 }
+    },
+    {
+      "name": "modularity", "analyzer": "function_split", "weight": 0.10,
+      "params": { "expect_helpers": true, "min_functions": 2 }
+    },
+    {
+      "name": "logical", "analyzer": "edge_case_runner", "weight": 0.10,
+      "params": { "cases": ["negatives", "zero", "int_overflow"], "llm_extra_cases": 5 }
+    },
+    {
+      "name": "complexity", "analyzer": "complexity_estimator", "weight": 0.10,
+      "params": { "required": "O(1)", "sizes": [1, 10, 100], "input_pattern": "two_ints_scaled" }
+    },
+    {
+      "name": "memory_safety", "analyzer": "sanitizer_run", "weight": 0.10,
+      "params": { "flags": "-fsanitize=address,undefined" }
+    },
+    {
+      "name": "readability", "analyzer": "llm_review", "weight": 0.10,
+      "params": { "temperature": 0, "seed": 42 }
+    },
+    {
+      "name": "originality", "analyzer": "similarity_flag", "weight": 0.10,
+      "params": { "corpus_dir": "submissions/", "flag_threshold": 0.85, "llm_baseline": true }
+    }
+  ]
+}

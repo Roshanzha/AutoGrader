@@ -1,0 +1,9 @@
+Read two signed 32-bit integers and print their sum followed by a newline.
+For sums outside the signed 32-bit range, print the signed 32-bit wrapped result,
+following the assignment's worked overflow example. Compute it without causing
+signed integer overflow in C.
+
+Sample input: 7 5
+Expected output: 12
+Boundary input: 2147483647 1
+Expected output: -2147483648

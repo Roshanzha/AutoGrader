@@ -21,6 +21,7 @@ import os
 import re
 
 import sandbox
+import utils
 
 NEEDS_EXECUTION = True
 
@@ -53,6 +54,12 @@ def analyze(ctx, params):
 
     env = {"ASAN_OPTIONS": "detect_leaks=1:color=never", "UBSAN_OPTIONS": "color=never"}
     found = {}      # issue name -> first input that triggers it, and its stderr line
+    expected_outputs = {}
+    for metric in ctx.rules["metrics"]:
+        if metric["analyzer"] == "io_tests":
+            tests = utils.load_tests(ctx.resolve(metric["params"]["testset_dir"]))
+            expected_outputs.update((stdin.rstrip("\n"), output) for _, stdin, output in tests)
+    failing = []
     inputs = ctx.known_inputs() or [("empty input", "")]
     for label, stdin_text in inputs:
         res = sandbox.run_binary(binary, stdin_text, ctx.time_limit_s * 5,
@@ -63,6 +70,11 @@ def analyze(ctx, params):
                              if "runtime error" in l or "ERROR:" in l or "SUMMARY" in l), "")
                 found[issue] = {"issue": issue, "triggered_by": label,
                                 "input": stdin_text.strip()[:200], "detail": line[:200]}
+                expected = expected_outputs.get(stdin_text.rstrip("\n"))
+                if expected is not None:
+                    failing.append({"test": f"Sanitizer on {label}", "input": utils.shorten(stdin_text),
+                                    "expected": utils.shorten(expected), "got": utils.shorten(res.stdout),
+                                    "note": line or issue})
 
     score = max(0.0, 1.0 - penalty * len(found))
     if found:
@@ -73,7 +85,7 @@ def analyze(ctx, params):
         feedback = f"Clean under {flags} on {len(inputs)} input(s)."
     return {
         "score": score,
-        "evidence": {"inputs_run": len(inputs), "issues": list(found.values())},
+        "evidence": {"inputs_run": len(inputs), "issues": list(found.values()), "failing": failing},
         "feedback": feedback,
         "suggestions": [f"Fix {i['issue']} (input {i['input']!r}): {i['detail']}" for i in found.values()],
     }

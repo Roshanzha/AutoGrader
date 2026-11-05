@@ -19,11 +19,15 @@ import glob
 import os
 import sys
 import tempfile
+import csv
+import json
+import zipfile
+from pathlib import Path
 
 import coordinator
 import rules_loader
 import result_analysis
-from test_uploads import TestUploadError
+from test_uploads import TestUploadError, load_test_files
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RULES_DIR = os.path.join(BASE_DIR, "rules")
@@ -75,6 +79,64 @@ def run_grading(c_file, rules_name, test_files=None):
     return text, report, list(paths), result_analysis.render_chart(report)
 
 
+def run_batch(c_files, rules_name, test_files=None, progress=None):
+    """Grade independent submissions with one shared rubric and test selection."""
+    if not c_files:
+        return 'Upload one or more C files first.', None, None, ''
+    if isinstance(c_files, (str, os.PathLike)):
+        c_files = [c_files]
+    if len(c_files) > 20:
+        return 'Upload at most 20 C files per batch.', None, None, ''
+    if rules_name not in list_rule_files():
+        return 'Select an available grading preset.', None, None, ''
+    try:
+        for file in c_files:
+            if Path(file).suffix.lower() != '.c' or Path(file).stat().st_size > 2*1024*1024:
+                raise ValueError('Each submission must be a .c file no larger than 2 MB.')
+        load_test_files(test_files)
+    except (ValueError, OSError) as exc:
+        return f'Upload error: {exc}', None, None, ''
+
+    os.makedirs(os.path.join(BASE_DIR, 'reports'), exist_ok=True)
+    folder = Path(tempfile.mkdtemp(prefix='batch_', dir=os.path.join(BASE_DIR, 'reports')))
+    entries, texts, artifacts = [], [], []
+    for index, source in enumerate(c_files, 1):
+        name = Path(source).name
+        if progress:
+            progress((index-1, len(c_files)), desc=f'Grading {index}/{len(c_files)}: {name}')
+        try:
+            text, report, paths, chart = run_grading(source, rules_name, test_files)
+        except Exception:
+            text, report, paths = 'This submission could not be graded. Try it separately.', None, None
+        status = ('Partial' if report.get('partial') else 'Complete') if report else 'Error'
+        entry = {'id': index, 'file': name, 'status': status, 'report': report}
+        if not report:
+            entry['error'] = text
+        entries.append(entry)
+        texts.append(f'=== {index}. {name} [{status}] ===\n{text}')
+        for path in paths or []:
+            artifacts.append((path, f'{index:02d}_{Path(source).stem}/{Path(path).name}'))
+
+    summary = {'preset': rules_name, 'submission_count': len(entries), 'submissions': entries}
+    json_path, csv_path, zip_path = folder/'batch_results.json', folder/'batch_scores.csv', folder/'all_reports.zip'
+    json_path.write_text(json.dumps(summary, indent=2, ensure_ascii=False), encoding='utf-8')
+    with csv_path.open('w', newline='', encoding='utf-8') as file:
+        writer = csv.writer(file)
+        writer.writerow(['Submission', 'File', 'Status', 'Grade / 100'])
+        for e in entries:
+            # Prevent spreadsheet formula evaluation of user-supplied filenames.
+            safe_name = "'"+e['file'] if e['file'].startswith(('=', '+', '-', '@')) else e['file']
+            writer.writerow([e['id'], safe_name, e['status'], e['report']['grade'] if e['report'] else ''])
+    with zipfile.ZipFile(zip_path, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for path, name in artifacts:
+            archive.write(path, name)
+        archive.write(json_path, json_path.name)
+        archive.write(csv_path, csv_path.name)
+    if progress:
+        progress(1, desc='Batch complete')
+    return '\n\n'.join(texts), summary, [str(zip_path), str(csv_path), str(json_path)], result_analysis.render_batch(entries)
+
+
 # ----------------------------------------------------------------------------
 # Web UI
 # ----------------------------------------------------------------------------
@@ -97,8 +159,9 @@ def build_ui():
 
         with gr.Row():
             with gr.Column():
-                gr.Markdown('## 1. Add your submission')
-                c_file = gr.File(label="C submission (.c)", file_types=[".c"], type="filepath")
+                gr.Markdown('## 1. Add your submissions')
+                c_file = gr.File(label="C submissions (.c) — select multiple files", file_types=[".c"], file_count='multiple', type="filepath")
+                gr.Markdown('Upload up to 20 independent C programs (2 MB each). Each is graded separately against the same preset and JSON tests; files are not linked together.')
                 test_files = gr.File(label='Optional JSON test files', file_types=['.json'], file_count='multiple', type='filepath')
             with gr.Column():
                 gr.Markdown('## 2. Choose the rubric')
@@ -115,12 +178,12 @@ def build_ui():
                 with gr.Accordion('View rubric configuration', open=False):
                     rules_view = gr.Textbox(label="Selected rules", lines=10, interactive=False)
 
-        gr.Examples(examples=[[os.path.join(ASSIGNMENT_DIR, "add.c"), ASSIGNMENT_RULES]],
+        gr.Examples(examples=[[[os.path.join(ASSIGNMENT_DIR, "add.c")], ASSIGNMENT_RULES]],
                     inputs=[c_file, rules], label="Example submission from the assignment")
-        run_btn = gr.Button("Grade", variant='primary')
-        gr.Markdown('## 3. Explore your result\nReview the pie chart, metric scores and test evidence, then download your reports.')
+        run_btn = gr.Button("Grade all submissions", variant='primary')
+        gr.Markdown('## 3. Compare your results\nView each score in the summary, expand a submission for its pie chart and evidence, then download all reports as a ZIP.')
         chart = gr.HTML()
-        saved = gr.File(label="Saved report files", file_count="multiple")
+        saved = gr.File(label="Download batch reports — ZIP, scores CSV, full JSON", file_count="multiple")
         with gr.Accordion('Detailed text report and upload messages', open=True):
             report_box = gr.Textbox(label="Report", lines=8, max_lines=30, interactive=False)
         with gr.Accordion('Structured JSON report', open=False):
@@ -129,7 +192,10 @@ def build_ui():
         # wiring: what happens when the user does something
         rules.change(show_rules, inputs=rules, outputs=rules_view)
         demo.load(show_rules, inputs=rules, outputs=rules_view)
-        run_btn.click(run_grading, inputs=[c_file, rules, test_files],
+        def grade_batch(files, preset, tests, progress=gr.Progress()):
+            return run_batch(files, preset, tests, progress)
+
+        run_btn.click(grade_batch, inputs=[c_file, rules, test_files],
                       outputs=[report_box, json_out, saved, chart])
     return demo
 

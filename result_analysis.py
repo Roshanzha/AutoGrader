@@ -129,3 +129,21 @@ def standalone(report):
     return ('<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" '
             'content="width=device-width,initial-scale=1"><title>AutoGrader report: ' + h(report["submission"])
             + '</title><style>' + STYLE + '</style><body class="gg-page">' + render_chart(report) + '</body></html>')
+
+
+def render_batch(entries):
+    parts = ['<section class="gg-result"><h2>Batch results</h2>',
+             '<p>Each score belongs to an independent submission. Partial grades include skipped checks; errors have no score.</p>',
+             '<table><thead><tr><th>Submission</th><th>Status</th><th>Grade / 100</th></tr></thead><tbody>']
+    for entry in entries:
+        report = entry['report']
+        score = f"{report['grade']:.1f}" if report else 'Not graded'
+        parts.append(f'<tr><td>{entry["id"]}. {h(entry["file"])}</td><td>{h(entry["status"])}</td><td>{score}</td></tr>')
+    parts.append('</tbody></table>')
+    for entry in entries:
+        opened = ' open' if len(entries) == 1 else ''
+        parts.append(f'<details{opened}><summary>{entry["id"]}. {h(entry["file"])} — {h(entry["status"])}</summary>')
+        parts.append(render_chart(entry['report']) if entry['report'] else f'<p>{h(entry["error"])}</p>')
+        parts.append('</details>')
+    parts.append('</section>')
+    return ''.join(parts)

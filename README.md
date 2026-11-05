@@ -21,6 +21,22 @@ Computer Science & Engineering, IIT Patna.
 
 Repository: [Roshanzha/AutoGrader](https://github.com/Roshanzha/AutoGrader)
 
+## New user start here
+
+Follow one installation route, then open the local app and grade your files:
+
+1. [Windows with Ubuntu in WSL2](#install-on-windows)
+2. [Ubuntu or Debian Linux](#install-on-ubuntu--debian)
+3. [macOS using an Ubuntu virtual machine](#install-on-macos-using-an-ubuntu-vm)
+4. [Register and grade one or multiple C files](#register-sign-in-and-grade)
+5. [Stop restart or update your installation](#stop-restart-and-update)
+
+You do not need the original developer's folders, virtual environment, or login
+account. Clone into your own folder, install the dependencies there, and register
+on your own local instance. A GitHub account is not required to clone this public
+repository. The browser interface currently accepts only `@iitp.ac.in` addresses;
+other users can use the command-line grader without registration.
+
 ## Watch AutoGrader in action
 
 ![AutoGrader workflow: register, sign in, upload C code, grade, review results, and download reports](docs/media/AutoGrader_Workflow.gif)
@@ -40,6 +56,7 @@ Registration and login use an `@iitp.ac.in` email address without mailbox verifi
 - An overall grade, per-metric chart, expandable evidence, and instructor flags.
 - A pie chart showing earned, deducted, and unmeasured points out of 100.
 - Multiple JSON test uploads with combined correctness scoring and per-file pass counts.
+- Batch upload of up to 20 independent C programs, with separate grades and a ZIP of all reports.
 - Downloadable HTML, text, and JSON reports with usefulness and limitations.
 - Light and dark themes, email-only registration, sign-in, and sign-out.
 - Optional local Ollama integration for readability, explanations, extra test inputs,
@@ -59,7 +76,7 @@ and documentation; `127.0.0.1:7860` opens your local instance after you start it
 5. **Register and sign in:** use your `@iitp.ac.in` email. The current web interface
    accepts only this domain and does not use a password or verify mailbox ownership.
 6. **Try the included example:** select **Agentic AI assignment**, select the example
-   `add.c`, and click **Grade**. You can then upload your own `.c` file for that assignment.
+   `add.c`, and click **Grade all submissions**. You can then upload your own `.c` file for that assignment.
 7. **Understand the result:** review the overall score, metric chart, failing inputs,
    expected versus actual outputs, and improvement suggestions.
 8. **Save your work:** download the HTML, text, and JSON reports. Sign out when finished;
@@ -124,6 +141,19 @@ wsl --install -d Ubuntu
 Restart Windows if requested. Open Ubuntu and complete the first-run setup by
 creating a Linux username and password.
 
+In PowerShell, verify the installation:
+
+```powershell
+wsl --list --verbose
+wsl -d Ubuntu
+```
+
+The first command should list `Ubuntu` with `VERSION` equal to `2`. The second
+opens the Ubuntu terminal; finish its username/password setup if prompted. Type
+`exit` to return to PowerShell. If Ubuntu is listed as version 1, convert it using
+`wsl --set-version Ubuntu 2` before continuing. See the official
+[Microsoft WSL installation guide](https://learn.microsoft.com/en-us/windows/wsl/install).
+
 If WSL reports that virtualization is disabled:
 
 1. Enable Intel Virtualization Technology / VT-x or AMD-V / SVM in BIOS/UEFI.
@@ -133,10 +163,21 @@ If WSL reports that virtualization is disabled:
 
 ### 2. Get the project
 
-Install Git for Windows if you use the clone command. In PowerShell, open the
-folder where you want to keep the project and run:
+Install Git for Windows if `git --version` is not recognized. In PowerShell:
 
 ```powershell
+winget install --id Git.Git -e --source winget
+```
+
+Close and reopen PowerShell after installation. If winget is unavailable, use the
+installer on the official [Git for Windows page](https://git-scm.com/install/windows).
+Then run these commands in a normal PowerShell terminal (administrator access is
+not needed to launch the application):
+
+```powershell
+git --version
+New-Item -ItemType Directory -Force "$env:USERPROFILE\Projects" | Out-Null
+Set-Location "$env:USERPROFILE\Projects"
 git clone https://github.com/Roshanzha/AutoGrader.git
 cd AutoGrader
 ```
@@ -160,6 +201,12 @@ several minutes, especially when the project is on a Windows drive.
 Keep the console open and visit **http://127.0.0.1:7860/**.
 Later launches reuse the environment. Press Ctrl+C in the console to stop.
 The older `Start-GraderGent.cmd` launcher forwards to `Start-AutoGrader.cmd`.
+
+Wait for the server's startup message before opening the page. The launcher
+installs Python dependencies inside Ubuntu; you do not need to activate a Windows
+Python environment or run `pip install` in PowerShell. In VS Code, open the cloned
+folder, choose **Terminal → New Terminal**, select **PowerShell**, and run
+`.\Start-AutoGrader.cmd` from the project root.
 
 The launcher targets a WSL distribution named `Ubuntu`. For a differently named
 Ubuntu distribution, open that distribution, change to the project directory,
@@ -190,19 +237,138 @@ python3 -m venv .venv-linux
 Run commands from the repository root. The web app imports FastAPI, Uvicorn,
 and python-multipart, which are installed with Gradio.
 
+To verify the installed environment from the project folder:
+
+```bash
+.venv-linux/bin/python --version
+gcc --version
+cppcheck --version
+.venv-linux/bin/python -c "import gradio, fastapi, uvicorn; print('Python dependencies are ready')"
+```
+
+## Install on macOS using an Ubuntu VM
+
+The grading engine does not run natively on macOS. Create an Ubuntu virtual
+machine using your VM software, choosing an Ubuntu image that matches the VM's
+CPU architecture (ARM64 on an ARM VM, or amd64 on an x86 VM). VM installation is
+specific to the software you choose and has not been validated by this project.
+
+Once Ubuntu is running, open a terminal **inside Ubuntu**, not the macOS Terminal,
+and run:
+
+```bash
+sudo apt-get update
+sudo apt-get install -y git build-essential cppcheck python3-venv python3-pip
+git clone https://github.com/Roshanzha/AutoGrader.git
+cd AutoGrader
+bash run-local.sh
+```
+
+Open `http://127.0.0.1:7860/` in a browser **inside the Ubuntu VM**. The macOS host's
+localhost is a different machine; host-browser access would require your VM's
+network/port-forwarding configuration. No such forwarding is needed when you use
+the browser in Ubuntu. The same Ubuntu VM approach applies to systems without
+the Linux tools required by the execution engine.
+
+## Stop restart and update
+
+**Stop:** press **Ctrl+C** in the terminal running AutoGrader. This stops the local
+server; it does not delete your accounts or saved reports.
+
+**Start again on Windows:** open PowerShell and run the following. If you cloned
+elsewhere, replace the folder with your actual project path.
+
+```powershell
+Set-Location "$env:USERPROFILE\Projects\AutoGrader"
+.\Start-AutoGrader.cmd
+```
+
+**Start again on Linux or inside the Ubuntu VM:** change to your clone and run:
+
+```bash
+cd ~/AutoGrader
+bash run-local.sh
+```
+
+`~/AutoGrader` assumes you cloned from your home directory. Use your actual folder
+if you cloned elsewhere. Sessions reset when the server restarts, so sign in again.
+
+**Update a Git clone:** stop the server first, then run from the project folder:
+
+```bash
+git status
+git switch main
+git pull --ff-only origin main
+```
+
+These Git commands work in PowerShell and Bash. If `git status` shows your own
+edits, save them in a commit or a separate backup before updating. If the pull
+reports a conflict or divergence, resolve it rather than deleting your changes.
+Start the app again using the command for your operating system. The launcher
+updates Python packages when `requirements.txt` changes.
+
+**Update a downloaded ZIP:** download a fresh ZIP from GitHub, extract it into a
+new folder, and follow setup again. A ZIP download has no Git history, so `git pull`
+does not work there. Keep any reports or custom rules you want to retain.
+
+**Use another port:** if port 7860 is occupied, choose 7861:
+
+```powershell
+# Windows PowerShell
+.\Start-AutoGrader.cmd --port 7861
+```
+
+```bash
+# Linux or Ubuntu terminal
+bash run-local.sh --port 7861
+```
+
+Open `http://127.0.0.1:7861/` for that instance. The default address is local to
+your computer; it is not a public hosted website.
+
 ## Register, sign in, and grade
 
 ### Add custom JSON test files
 
 ![AutoGrader result with a grade pie chart and per-file JSON test results](docs/media/AutoGrader_Result.png)
 
-1. Start the app, sign in, and upload one `.c` submission.
+1. Start the app, sign in, and upload one or more `.c` submissions.
 2. Choose the grading preset for the same programming problem.
 3. Optionally upload multiple `.json` files in **Optional JSON test files**.
-4. Click **Grade**. The result includes a grade pie chart, metric bars, and each
+4. Click **Grade all submissions**. Expand each submission to view its grade pie chart, metric bars, and each
    uploaded file's passed/total count and pass rate.
-5. Download HTML, text, and JSON reports. Each web run saves to a separate folder
-   under `reports/`, so another run does not overwrite its downloads.
+5. Download **all_reports.zip**, **batch_scores.csv**, or **batch_results.json**.
+   The ZIP contains each submission's HTML, text, and JSON reports in numbered
+   folders, plus the batch summary. Separate run folders prevent report overwrites.
+
+### Grade multiple C submissions at once
+
+![Upload several C programs and shared JSON tests in AutoGrader](docs/media/AutoGrader_Batch_Upload.png)
+
+Select several files in **C submissions** using Ctrl-click (Windows/Linux) or
+Command-click (macOS), or drag several C files into the upload area. Upload the
+shared JSON test files, select one preset, and click **Grade all submissions**.
+All C files must solve the same selected problem. Each is compiled independently;
+this is batch grading of separate programs, not linking a multi-file C project.
+
+The limit is 20 C files, each up to 2 MB. The progress indicator identifies the
+current submission. Programs are graded sequentially to reduce competition for
+the execution time limit. A compilation failure or timeout produces a partial
+grade, while an unexpected grading error is labeled **Error** with no score;
+the remaining files continue. Duplicate filenames retain separate numbered report
+folders. The comparison table lists all scores, and each expandable result has its
+own analysis. The same combined JSON test set is used for every submission.
+
+For a terminal batch, use:
+
+```bash
+bash run-local.sh --cli samples/add_basic.c samples/add_clean.c --tests examples/tests/basic.json examples/tests/negative.json
+```
+
+The ZIP and comparison-table workflow is available in the web interface. CLI
+grading prints each report and saves individual report files.
+
+### JSON file format
 
 Each file contains a non-empty `tests` array (a top-level array is also accepted):
 
@@ -253,6 +419,7 @@ From the project folder inside Linux/Ubuntu, run:
 ```bash
 .venv-linux/bin/python -m unittest discover -s tests
 .venv-linux/bin/python tests/run_upload_integration.py
+.venv-linux/bin/python tests/run_batch_integration.py
 ```
 
 The integration check grades sample C files, checks combined and per-file results,
@@ -276,7 +443,7 @@ flowchart TD
     F --> G[Write your C code and save it as a .c file]
     G --> H[Upload your .c file]
     F --> I[Or select the provided example C file]
-    H --> J[Click Grade]
+    H --> J[Click Grade all submissions]
     I --> J
     J --> K[AutoGrader compiles, runs, and analyzes the code]
     K --> L[View your grade and metric chart]
@@ -294,7 +461,7 @@ Quick path: **Start → Register → Log in → Select rules → Upload C file �
 3. Sign in using the registered address.
 4. Select **Agentic AI assignment**, the default rules preset.
 5. Upload a `.c` file, or click the included assignment example.
-6. Click **Grade**.
+6. Click **Grade all submissions**.
 7. Read the chart, result analysis, test evidence, findings, suggestions, and flags.
 8. Download the HTML, text, and JSON reports. Use **Sign out** when finished.
 

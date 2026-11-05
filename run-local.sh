@@ -2,7 +2,7 @@
 set -euo pipefail
 cd -- "$(dirname -- "${BASH_SOURCE[0]}")"
 
-if ! command -v gcc >/dev/null || [ ! -f /usr/include/stdio.h ] || ! command -v cppcheck >/dev/null || ! python3 -c 'import venv' 2>/dev/null; then
+if ! command -v gcc >/dev/null || [ ! -f /usr/include/stdio.h ] || ! command -v cppcheck >/dev/null || ! python3 -c 'import venv, ensurepip' 2>/dev/null; then
     echo 'Installing the Linux compiler and Python tools...'
     sudo apt-get update
     sudo apt-get install -y build-essential cppcheck python3-venv python3-pip

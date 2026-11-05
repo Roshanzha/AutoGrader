@@ -19,3 +19,7 @@ __pycache__/
 
 # Downloadable release archives are built locally, not committed recursively
 /dist/
+
+# Private local review documents
+/docs/presentation/
+/docs/report/

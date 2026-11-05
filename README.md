@@ -30,19 +30,6 @@ ending with **82.3 / 100**, per-metric analysis, and HTML, text, and JSON downlo
 Pauses are condensed; the animation is not a grading-speed benchmark.
 Registration and login use an `@iitp.ac.in` email address without mailbox verification.
 
-## Project review materials
-
-- [15-slide Team Everest presentation](docs/presentation/AutoGrader_Team_Everest.pptx)
-  — includes the demo GIF on slide 4; use PowerPoint Slide Show mode to animate it.
-- [Download the workflow GIF](docs/media/AutoGrader_Workflow.gif)
-- [Six-page IEEE-format project report](docs/report/AutoGrader_IEEE_Conference.pdf)
-- [LaTeX report source and figures](docs/report/source/)
-
-To save the complete project from GitHub, choose **Code → Download ZIP**, extract
-the archive, and follow the setup instructions below. The ZIP includes the source,
-assignment, sample reports, and review materials. Python packages and system tools
-are installed during setup; they are not bundled in the archive.
-
 ## Features
 
 - Compile checks, smoke execution, and static sanity checks before specialist analysis.

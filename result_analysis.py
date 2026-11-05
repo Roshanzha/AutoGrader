@@ -19,6 +19,11 @@ STYLE = """
 .gg-result .gg-track{height:12px;background:var(--gg-track);border-radius:3px;overflow:hidden}.gg-result .gg-fill{height:100%;background:var(--gg-bar)}
 .gg-result .gg-pts{text-align:right;font-variant-numeric:tabular-nums}
 .gg-result ul{padding-left:22px;list-style:disc}
+.gg-overview{display:flex;align-items:center;gap:28px;flex-wrap:wrap;margin:20px 0}
+.gg-pie{width:190px;height:190px;border-radius:50%;flex-shrink:0;border:2px solid var(--gg-line);print-color-adjust:exact}
+.gg-result table{width:100%;border-collapse:collapse;margin:12px 0;color:var(--gg-fg)}
+.gg-result th,.gg-result td{text-align:left;padding:10px;border-bottom:1px solid var(--gg-line);color:var(--gg-fg)}
+.gg-result .gg-key{display:inline-block;width:12px;height:12px;margin-right:8px;border-radius:2px}
 .dark .gg-result{--gg-bg:#15252b;--gg-fg:#e3eef1;--gg-line:#465b62;--gg-head:#a9e6dc;--gg-code:#20333a;--gg-track:#41565c;--gg-bar:#70d6c6}
 @media(prefers-color-scheme:dark){body.gg-page{background:#101c21}body.gg-page .gg-result{--gg-bg:#15252b;--gg-fg:#e3eef1;--gg-line:#465b62;--gg-head:#a9e6dc;--gg-code:#20333a;--gg-track:#41565c;--gg-bar:#70d6c6}}
 .gg-result :is(p,span,li,strong,pre){color:var(--gg-fg)}
@@ -37,6 +42,8 @@ def analysis(report):
         ev = metric["evidence"]
         if "tests_total" in ev:
             lines.append(f"The program passed {ev['tests_passed']} of {ev['tests_total']} output tests.")
+        for name, counts in ev.get('uploaded_suites', {}).items():
+            lines.append(f"{name}: {counts['passed']}/{counts['total']} uploaded tests passed.")
         if ev.get("issues"):
             issue = ev["issues"][0]
             lines.append(f"The memory check detected {issue['issue']} on input {issue['input']!r}.")
@@ -56,7 +63,28 @@ def render_chart(report):
     metrics = report["metrics"]
     parts = [f'<article class="gg-result"><h2>{report["grade"]:.1f} / 100</h2>',
              f'<p>{h(report["submission"])} &middot; {h(report["problem"])}</p>',
-             '<h3>Result analysis</h3>']
+             ]
+    earned = min(100, max(0, report['grade']))
+    unmeasured = sum(100*m['weight'] for m in metrics if {'skipped', 'error'} & m['evidence'].keys())
+    unmeasured = min(100-earned, max(0, unmeasured))
+    deducted = max(0, 100-earned-unmeasured)
+    label = f'Earned {earned:.1f}, deducted {deducted:.1f}, unmeasured {unmeasured:.1f} points out of 100'
+    parts.append(f'<div class="gg-overview"><div class="gg-pie" role="img" aria-label="{label}" '
+                 f'style="background:conic-gradient(#21756f 0% {earned}%,#c46b39 {earned}% {earned+deducted}%,#8797a1 {earned+deducted}% 100%)"></div><div><h3>Grade breakdown</h3>')
+    for name, value, color in [('Earned', earned, '#21756f'), ('Deducted', deducted, '#c46b39'), ('Unmeasured / skipped', unmeasured, '#8797a1')]:
+        parts.append(f'<p><span class="gg-key" style="background:{color}"></span>{name}: {value:.1f} points</p>')
+    parts.append('<p>Pie slices total 100 points. Unmeasured checks earn zero.</p></div></div>')
+    if report.get('uploaded_tests'):
+        parts.append('<h3>Uploaded JSON tests</h3><p>Uploaded cases replace preset output tests. Other rubric checks still use the selected preset.</p>')
+        suites = next((m['evidence']['uploaded_suites'] for m in metrics if m['evidence'].get('uploaded_suites')), {})
+        if suites:
+            parts.append('<table><thead><tr><th>JSON file</th><th>Passed / total</th><th>Pass rate</th></tr></thead><tbody>')
+            for name, counts in suites.items():
+                parts.append(f'<tr><td>{h(name)}</td><td>{counts["passed"]} / {counts["total"]}</td><td>{100*counts["passed"]/counts["total"]:.1f}%</td></tr>')
+            parts.append('</tbody></table><p>The correctness score uses all uploaded cases equally, not an average of file percentages.</p>')
+        else:
+            parts.append('<p>Uploaded test results are unavailable because correctness checks were skipped or failed.</p>')
+    parts.append('<h3>Result analysis</h3>')
     parts.extend(f'<p>{h(line)}</p>' for line in analysis(report))
     parts.extend(['<h3>Points earned by metric</h3>',
                   '<p>Each bar shows the share of available points earned for that metric.</p>'])

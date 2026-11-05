@@ -23,6 +23,13 @@ def sha256_text(text):
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
+def metric_tests(ctx, params):
+    """Return validated uploaded tests or the preset's on-disk pairs."""
+    if 'uploaded_tests' in params:
+        return [(t['id'], t['input'], t['expected']) for t in params['uploaded_tests']]
+    return load_tests(ctx.resolve(params['testset_dir']))
+
+
 def load_tests(testset_dir):
     """
     Load test cases from a directory.

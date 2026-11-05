@@ -38,6 +38,8 @@ Registration and login use an `@iitp.ac.in` email address without mailbox verifi
   memory safety, readability, and originality analysis.
 - Counterexamples with expected and actual output, explanations, and suggestions.
 - An overall grade, per-metric chart, expandable evidence, and instructor flags.
+- A pie chart showing earned, deducted, and unmeasured points out of 100.
+- Multiple JSON test uploads with combined correctness scoring and per-file pass counts.
 - Downloadable HTML, text, and JSON reports with usefulness and limitations.
 - Light and dark themes, email-only registration, sign-in, and sign-out.
 - Optional local Ollama integration for readability, explanations, extra test inputs,
@@ -94,6 +96,20 @@ to configure a different assignment before grading unrelated programs.
 The runner uses Linux Bash, process groups, and resource limits. Windows setup uses
 WSL2 for execution. On macOS, run the project inside an Ubuntu virtual machine.
 The installation and verification below cover Linux and Windows/WSL.
+
+### Choose the right setup for your computer
+
+| Your system | How to run after cloning |
+|---|---|
+| Windows 10/11 with WSL2 support | Install Ubuntu in WSL2, then use `Start-AutoGrader.cmd` as described below. Enable virtualization first. |
+| Ubuntu / Debian Linux | Follow the Linux terminal commands below. |
+| macOS on Intel or Apple Silicon | Create an Ubuntu VM matching your CPU architecture, then clone and run the project inside that VM using the Linux instructions. Open the browser inside the VM. |
+| Other Linux distributions | Use an Ubuntu VM, or install equivalent GCC, sanitizer, cppcheck, Python 3, pip and venv packages using your distribution's package manager. Other distributions are not validated here. |
+
+The execution engine requires Linux Bash and process controls. Native Windows and
+native macOS execution are not supported. The app is not automatically hosted by
+GitHub: each user starts their own local server. First-time setup needs internet
+access; optional Ollama model downloads are separate.
 
 ## Install on Windows
 
@@ -175,6 +191,74 @@ Run commands from the repository root. The web app imports FastAPI, Uvicorn,
 and python-multipart, which are installed with Gradio.
 
 ## Register, sign in, and grade
+
+### Add custom JSON test files
+
+![AutoGrader result with a grade pie chart and per-file JSON test results](docs/media/AutoGrader_Result.png)
+
+1. Start the app, sign in, and upload one `.c` submission.
+2. Choose the grading preset for the same programming problem.
+3. Optionally upload multiple `.json` files in **Optional JSON test files**.
+4. Click **Grade**. The result includes a grade pie chart, metric bars, and each
+   uploaded file's passed/total count and pass rate.
+5. Download HTML, text, and JSON reports. Each web run saves to a separate folder
+   under `reports/`, so another run does not overwrite its downloads.
+
+Each file contains a non-empty `tests` array (a top-level array is also accepted):
+
+```json
+{
+  "tests": [
+    {"input": "2 3\n", "expected": "5\n"},
+    {"input": "-5 -7\n", "expected": "-12\n"}
+  ]
+}
+```
+
+Use strings for standard input and expected standard output, including `\n` where
+needed. Download the [basic](examples/tests/basic.json) and
+[negative-input](examples/tests/negative.json) examples, or use the downloads in
+the interface. Limits: 10 files, 1 MB per file, 100 cases combined, and 16 KB per
+input/output string. Invalid or empty uploads produce an error instead of a grade.
+
+Uploaded files **replace only the preset output tests**. All cases have equal
+weight within correctness, even if the files contain different numbers of cases.
+Other rubric metrics, edge cases, reference solution and weights remain those of
+the selected preset. JSON test uploads are test data, not rule configuration files.
+For a different assignment, configure a matching preset first. Leave uploads
+empty to use the original preset tests.
+
+The pie chart displays **grade points**, not test accuracy. Skipped checks and
+analyzer errors are labeled unmeasured and earn zero. The exported JSON includes
+uploaded cases and file hashes so that the input to a custom run is recorded.
+
+CLI users can supply the same files from an Ubuntu/WSL terminal:
+
+```bash
+bash run-local.sh --cli problems/agentic_ai/add.c --tests examples/tests/basic.json examples/tests/negative.json
+```
+
+### Start again after the first installation
+
+Open a terminal in the cloned/extracted project folder. On Windows run
+`.\Start-AutoGrader.cmd`; inside Linux/Ubuntu run `bash run-local.sh`. Keep that
+terminal open and visit `http://127.0.0.1:7860/`. Sign in again after a server
+restart. If the port is occupied, add `--port 7861` and open port 7861 instead.
+Use `git pull` from the project folder to receive repository updates before starting.
+
+### Verify JSON uploads after setup
+
+From the project folder inside Linux/Ubuntu, run:
+
+```bash
+.venv-linux/bin/python -m unittest discover -s tests
+.venv-linux/bin/python tests/run_upload_integration.py
+```
+
+The integration check grades sample C files, checks combined and per-file results,
+verifies partial reports and exports, and rejects invalid test uploads. It writes
+sample run reports locally. Run it when the machine is idle: the assignment's
+short execution time limit can be affected by system load.
 
 ### User workflow
 

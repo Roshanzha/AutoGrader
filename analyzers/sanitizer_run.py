@@ -57,7 +57,7 @@ def analyze(ctx, params):
     expected_outputs = {}
     for metric in ctx.rules["metrics"]:
         if metric["analyzer"] == "io_tests":
-            tests = utils.load_tests(ctx.resolve(metric["params"]["testset_dir"]))
+            tests = utils.metric_tests(ctx, metric["params"])
             expected_outputs.update((stdin.rstrip("\n"), output) for _, stdin, output in tests)
     failing = []
     inputs = ctx.known_inputs() or [("empty input", "")]

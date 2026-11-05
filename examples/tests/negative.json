@@ -1,0 +1,1 @@
+{"tests": [{"input": "-5 -7\n", "expected": "-12\n"}, {"input": "-1 5\n", "expected": "4\n"}]}

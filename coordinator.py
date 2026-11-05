@@ -48,13 +48,24 @@ _WRITERS = r"\b(printf|fprintf|puts|putchar|putc|fputc|fputs|fwrite|write)\s*\("
 # ----------------------------------------------------------------------------
 # Public entry point
 # ----------------------------------------------------------------------------
-def grade_submission(source_path, rules_path, out_dir=None):
+def grade_submission(source_path, rules_path, out_dir=None, test_files=None):
     """
     Grade one C file under one rules file.
-    Returns (report_dict, text_report, (json_path, txt_path)).
+    Returns (report_dict, text_report, (json_path, txt_path, html_path)).
     Raises rules_loader.RulesError if the rules file is unusable.
     """
     rules = rules_loader.load_rules(rules_path)
+    if test_files:
+        from test_uploads import load_test_files, TestUploadError
+        tests = load_test_files(test_files)
+        targets = [m for m in rules['metrics'] if m['analyzer'] == 'io_tests']
+        if not targets:
+            raise TestUploadError('The selected rubric has no correctness test analyzer.')
+        for metric in targets:
+            metric.setdefault('params', {})['uploaded_tests'] = tests
+        rules['_uploaded_tests'] = tests
+        rules['_hash'] = 'sha256:' + utils.sha256_text(json.dumps(
+            {k: v for k, v in rules.items() if not k.startswith('_')}, sort_keys=True))
     workdir = tempfile.mkdtemp(prefix="gradergent_")     # private scratch space
     try:
         ctx = Context(source_path=source_path, source_text=utils.read_text(source_path),
@@ -85,7 +96,7 @@ def _load_problem_files(ctx):
         return
     for m in ctx.rules["metrics"]:
         if m["analyzer"] == "io_tests":
-            tests = utils.load_tests(ctx.resolve(m["params"]["testset_dir"]))
+            tests = utils.metric_tests(ctx, m["params"])
             if tests:
                 _, ctx.smoke_input, ctx.smoke_expected = tests[0]
                 return
@@ -221,6 +232,7 @@ def collate(ctx, first, results):
     llm_cfg = ctx.rules.get("llm", {})
     return {
         "submission": os.path.basename(ctx.source_path),
+        "uploaded_tests": ctx.rules.get('_uploaded_tests', []),
         "source_sha256": utils.sha256_text(ctx.source_text),
         "rules_hash": ctx.rules["_hash"],
         "problem": ctx.rules.get("problem", ""),

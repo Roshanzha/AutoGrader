@@ -16,5 +16,5 @@ if ! cmp -s requirements.txt .venv-linux/installed-requirements.txt; then
     cp requirements.txt .venv-linux/installed-requirements.txt
 fi
 
-echo 'AutoGrader: http://127.0.0.1:7860 (Ctrl+C to stop)'
+echo 'Starting AutoGrader. The server log shows the address and port (Ctrl+C to stop).'
 exec .venv-linux/bin/python front_app.py "$@"

@@ -73,7 +73,7 @@ class Context:
 
         for m in self.rules.get("metrics", []):
             if m.get("analyzer") == "io_tests":
-                for name, stdin_text, _ in utils.load_tests(self.resolve(m["params"]["testset_dir"])):
+                for name, stdin_text, _ in utils.metric_tests(self, m["params"]):
                     add(f"test {name}", stdin_text)
         for case_name, inputs in self.rules.get("edge_cases", {}).items():
             for k, text in enumerate(inputs, 1):

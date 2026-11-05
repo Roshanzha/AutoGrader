@@ -3,7 +3,7 @@ front_app.py - MAIN FILE of AutoGrader (entry point).
 
 Two ways to use it:
 
-  1) Web UI (Gradio, plain and colourless):
+  1) Web UI (Gradio):
          python front_app.py
      then open http://127.0.0.1:7860
 
@@ -18,10 +18,12 @@ import argparse
 import glob
 import os
 import sys
+import tempfile
 
 import coordinator
 import rules_loader
 import result_analysis
+from test_uploads import TestUploadError
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 RULES_DIR = os.path.join(BASE_DIR, "rules")
@@ -48,18 +50,24 @@ def show_rules(rules_name):
         return f"Cannot read rules file: {e}"
 
 
-def run_grading(c_file, rules_name):
+def run_grading(c_file, rules_name, test_files=None):
     """
     Called by the UI button.
-    Returns (text report, JSON report, [saved file paths]).
+    Returns (text report, JSON report, [saved file paths], chart HTML).
     """
     if not c_file:
         return "Please upload a .c file first.", None, None, ""
     if rules_name not in list_rule_files():
         return "Select an available rules file.", None, None, ""
+    if not str(c_file).lower().endswith('.c'):
+        return "Please upload a C source file ending in .c.", None, None, ""
     try:
+        os.makedirs(os.path.join(BASE_DIR, 'reports'), exist_ok=True)
+        output = tempfile.mkdtemp(prefix='run_', dir=os.path.join(BASE_DIR, 'reports'))
         report, text, paths = coordinator.grade_submission(
-            c_file, os.path.join(RULES_DIR, rules_name))
+            c_file, os.path.join(RULES_DIR, rules_name), out_dir=output, test_files=test_files)
+    except TestUploadError as e:
+        return f"Test upload error: {e}", None, None, ""
     except rules_loader.RulesError as e:
         return f"Problem with the rules file: {e}", None, None, ""
     except Exception as e:                                  # never show a stack trace to the user
@@ -73,14 +81,14 @@ def run_grading(c_file, rules_name):
 def build_ui():
     import gradio as gr   # imported here so that --cli works without gradio installed
 
-    # All-grey theme: no accent colours.
-    theme = gr.themes.Base(primary_hue="gray", secondary_hue="gray", neutral_hue="gray")
+    # Theme follows the browser's light/dark appearance.
+    theme = gr.themes.Base(primary_hue="teal", secondary_hue="cyan", neutral_hue="slate")
     rule_files = list_rule_files()
 
     with gr.Blocks(title="AutoGrader", theme=theme, css=result_analysis.STYLE) as demo:
-        gr.Markdown("# AutoGrader\nRule-driven grading of C programs.")
+        gr.Markdown("# AutoGrader\n### Upload. Evaluate. Understand.\nTeam Everest · C program evaluation with evidence and visual feedback.")
         gr.HTML('<form method="post" action="/logout"><button type="submit">Sign out</button></form>')
-        with gr.Accordion("Agentic AI assignment", open=True):
+        with gr.Accordion("Assignment brief and instructions", open=False):
             gr.Markdown("Read two integers and print their sum. For this assignment, "
                         "use the **Agentic AI assignment** rule set. Upload your C file "
                         "or select the example below, then click **Grade**.")
@@ -88,29 +96,40 @@ def build_ui():
                     label="Assignment brief", interactive=False)
 
         with gr.Row():
-            c_file = gr.File(label="C submission (.c)", file_types=[".c"], type="filepath")
             with gr.Column():
+                gr.Markdown('## 1. Add your submission')
+                c_file = gr.File(label="C submission (.c)", file_types=[".c"], type="filepath")
+                test_files = gr.File(label='Optional JSON test files', file_types=['.json'], file_count='multiple', type='filepath')
+            with gr.Column():
+                gr.Markdown('## 2. Choose the rubric')
                 choices = [("Agentic AI assignment", name) if name == ASSIGNMENT_RULES
                            else (name, name) for name in rule_files]
                 rules = gr.Dropdown(choices=choices,
                                     value=ASSIGNMENT_RULES if ASSIGNMENT_RULES in rule_files
                                     else next(iter(rule_files), None),
-                                    label="Rules file (edit the JSON files in rules/)")
-                rules_view = gr.Textbox(label="Selected rules (read-only)", lines=10,
-                                        interactive=False)
+                                    label="Grading preset")
+                gr.Markdown('Leave JSON uploads empty to use preset tests. Upload up to 10 files / 100 cases to replace output tests. Other metrics still use this preset; use cases for the same problem.')
+                with gr.Accordion('JSON test format and examples', open=False):
+                    gr.Code(value='{"tests": [{"input": "2 3\\n", "expected": "5\\n"}]}', language='json', interactive=False)
+                    gr.File(value=[os.path.join(BASE_DIR, 'examples/tests/basic.json'), os.path.join(BASE_DIR, 'examples/tests/negative.json')], label='Download sample JSON files', interactive=False, file_count='multiple')
+                with gr.Accordion('View rubric configuration', open=False):
+                    rules_view = gr.Textbox(label="Selected rules", lines=10, interactive=False)
 
         gr.Examples(examples=[[os.path.join(ASSIGNMENT_DIR, "add.c"), ASSIGNMENT_RULES]],
                     inputs=[c_file, rules], label="Example submission from the assignment")
-        run_btn = gr.Button("Grade")
+        run_btn = gr.Button("Grade", variant='primary')
+        gr.Markdown('## 3. Explore your result\nReview the pie chart, metric scores and test evidence, then download your reports.')
         chart = gr.HTML()
-        report_box = gr.Textbox(label="Report", lines=30, max_lines=80, interactive=False)
-        json_out = gr.JSON(label="JSON report")
         saved = gr.File(label="Saved report files", file_count="multiple")
+        with gr.Accordion('Detailed text report and upload messages', open=True):
+            report_box = gr.Textbox(label="Report", lines=8, max_lines=30, interactive=False)
+        with gr.Accordion('Structured JSON report', open=False):
+            json_out = gr.JSON(label="JSON report")
 
         # wiring: what happens when the user does something
         rules.change(show_rules, inputs=rules, outputs=rules_view)
         demo.load(show_rules, inputs=rules, outputs=rules_view)
-        run_btn.click(run_grading, inputs=[c_file, rules],
+        run_btn.click(run_grading, inputs=[c_file, rules, test_files],
                       outputs=[report_box, json_out, saved, chart])
     return demo
 
@@ -118,13 +137,13 @@ def build_ui():
 # ----------------------------------------------------------------------------
 # Command line
 # ----------------------------------------------------------------------------
-def run_cli(files, rules_path):
+def run_cli(files, rules_path, test_files=None):
     """Grade each file, print the text report, return a process exit code."""
     status = 0
     for path in files:
         try:
-            _, text, paths = coordinator.grade_submission(path, rules_path)
-        except (rules_loader.RulesError, OSError) as e:
+            _, text, paths = coordinator.grade_submission(path, rules_path, test_files=test_files)
+        except (rules_loader.RulesError, TestUploadError, OSError) as e:
             print(f"{path}: {e}", file=sys.stderr)
             status = 1
             continue
@@ -140,11 +159,12 @@ def main():
     parser.add_argument("--rules", default=os.path.join(RULES_DIR, ASSIGNMENT_RULES),
                         help="rules file for --cli (default: rules/agentic_ai.json)")
     parser.add_argument("--host", default="127.0.0.1", help="UI host (use 0.0.0.0 to share on a LAN)")
+    parser.add_argument('--tests', nargs='+', metavar='TESTS.json', help='optional JSON output-test files for CLI grading')
     parser.add_argument("--port", type=int, default=7860, help="UI port")
     args = parser.parse_args()
 
     if args.cli:
-        sys.exit(run_cli(args.cli, args.rules))
+        sys.exit(run_cli(args.cli, args.rules, args.tests))
     import uvicorn
     from web_access import create_app
     uvicorn.run(create_app(build_ui()), host=args.host, port=args.port)
